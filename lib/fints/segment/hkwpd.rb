@@ -2,7 +2,7 @@ module FinTS
   module Segment
     # HKWPD (Depotaufstellung anfordern)
     # Section C.4.3.1
-    # Example: HKPWD:3:7+23456::280:10020030+USD+2'
+    # Example: HKWPD:3:7+23456::280:10020030+USD+2'
     class HKWPD < BaseSegment
       def initialize(segno, version, account)
         # The spec allows the specification of currency and
@@ -19,7 +19,7 @@ module FinTS
       protected
 
       def type
-        'HKPWD'
+        'HKWPD'
       end
       
       def version

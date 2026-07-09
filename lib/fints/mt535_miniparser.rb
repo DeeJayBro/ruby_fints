@@ -1,4 +1,8 @@
+require 'date'
+
 module FinTS
+  # Parses the MT535 (statement of holdings) message that banks return inside
+  # the HIWPD segment when a securities account (Depot) is queried via HKWPD.
   class MT535Miniparser
     RE_IDENTIFICATION = /^:35B:ISIN\s(.*)\|(.*)\|(.*)$/
     RE_MARKETPRICE = /^:90B::MRKT\/\/ACTU\/([A-Z]{3})(\d*),{1}(\d*)$/
@@ -10,8 +14,7 @@ module FinTS
       retval = []
       # First: Collapse multiline clauses into one clause
       clauses = collapse_multilines(lines)
-      # Second: Scan sequence of clauses for financial instrument
-      # sections
+      # Second: Scan sequence of clauses for financial instrument sections
       finsegs = grab_financial_instrument_segments(clauses)
       # Third: Extract financial instrument data
       finsegs.each do |finseg|
@@ -35,13 +38,13 @@ module FinTS
           # e.g. ':98A::PRIC//20170428'
           m = RE_PRICEDATE.match(clause)
           if m
-            price_date = Time.strptime(m[1], '%Y%m%d').date()
+            price_date = Date.strptime(m[1], '%Y%m%d')
           end
           # number of pieces
           # e.g. ':93B::AGGR//UNIT/16,8211'
           m = RE_PIECES.match(clause)
           if m
-            pieces = (m[1] + '.' + m[2]).to_s
+            pieces = (m[1] + '.' + m[2]).to_f
           end
           # total value of holding
           # e.g. ':19A::HOLD//EUR970,17'
@@ -61,25 +64,29 @@ module FinTS
           total_value: total_value
         }
       end
-          
+
       retval
     end
 
     def collapse_multilines(lines)
       clauses = []
-      prevline = ''
+      prevline = nil
       lines.each do |line|
         if line.start_with?(':')
-          clauses << prevline if prevline != ''
+          clauses << prevline unless prevline.nil?
           prevline = line
-        elsif line.startswith("-")
-          # last line
-          clauses << prevline
+        elsif line.start_with?('-')
+          # end of message
+          clauses << prevline unless prevline.nil?
+          prevline = nil
           clauses << line
         else
-          prevline += "|#{line}"
+          # continuation of the previous clause
+          prevline = prevline.nil? ? line : "#{prevline}|#{line}"
         end
       end
+      # flush a trailing clause when the message has no '-' terminator
+      clauses << prevline unless prevline.nil?
       clauses
     end
 
@@ -91,9 +98,9 @@ module FinTS
         if clause.start_with?(':16R:FIN')
           # start of financial instrument
           within_financial_instrument = true
-        elsif clause.startswith(':16S:FIN')
-          # end of financial instrument - move stack over to
-          # return value
+          stack = []
+        elsif clause.start_with?(':16S:FIN')
+          # end of financial instrument - move stack over to return value
           retval << stack
           stack = []
           within_financial_instrument = false

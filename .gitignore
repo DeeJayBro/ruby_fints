@@ -56,3 +56,6 @@ doc
 pkg/
 
 /Gemfile.lock
+# contains credentials
+integration_test.rb
+examples/get_balance.rb

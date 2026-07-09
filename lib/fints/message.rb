@@ -4,10 +4,11 @@ module FinTS
     attr_accessor :dialog_id
     attr_accessor :encrypted_segments
 
-    def initialize(blz, username, pin, system_id, dialog_id, msg_no, encrypted_segments, tan_mechs=nil)
+    def initialize(blz, username, pin, system_id, dialog_id, msg_no, encrypted_segments, tan_mechs=nil, skip_signature: false, tan: nil)
       @blz = blz
       @username = username
       @pin = pin
+      @tan = tan
       @system_id = system_id
       @dialog_id = dialog_id
       @msg_no = msg_no
@@ -22,22 +23,40 @@ module FinTS
         @security_function = '999'
       end
 
-      sig_head = build_signature_head
-      enc_head = build_encryption_head
-      @segments << enc_head
+      if skip_signature
+        # Anonymous access (FinTS 3.0 Formals, section C.5): the message is
+        # transmitted in plaintext, i.e. with neither an encryption envelope
+        # (HNVSK/HNVSD) nor a signature (HNSHK/HNSHA). The payload segments
+        # follow the message header directly and are numbered sequentially.
+        FinTS::Client.logger.debug("Building anonymous message (no signature, no encryption)")
+        segno = 2
+        encrypted_segments.each do |segment|
+          segment.segmentno = segno
+          @segments << segment
+          @encrypted_segments << segment
+          segno += 1
+        end
 
-      @enc_envelop = Segment::HNVSD.new(999, '')
-      @segments << @enc_envelop
+        cur_count = segno - 1
+      else
+        sig_head = build_signature_head
+        enc_head = build_encryption_head
+        @segments << enc_head
 
-      append_enc_segment(sig_head)
-      encrypted_segments.each do |segment|
-        append_enc_segment(segment)
+        @enc_envelop = Segment::HNVSD.new(999, '')
+        @segments << @enc_envelop
+
+        append_enc_segment(sig_head)
+        encrypted_segments.each do |segment|
+          append_enc_segment(segment)
+        end
+
+        cur_count = encrypted_segments.length + 3
+
+        sig_end = Segment::HNSHA.new(cur_count, @secref, @pin, tan: @tan)
+        append_enc_segment(sig_end)
       end
 
-      cur_count = encrypted_segments.length + 3
-
-      sig_end = Segment::HNSHA.new(cur_count, @secref, @pin)
-      append_enc_segment(sig_end)
       @segments << Segment::HNHBS.new(cur_count + 1, msg_no)
     end
 
@@ -48,7 +67,10 @@ module FinTS
 
     def build_signature_head
       @secref = Kernel.rand(1000000..9999999)
-      Segment::HNSHK.new(2, @secref, @blz, @username, @system_id, @profile_version, @security_function)
+      # Use the message number as the (per-dialog, strictly increasing)
+      # Sicherheitsreferenznummer so a second signed message in the same dialog
+      # (e.g. a decoupled SCA status poll) is not rejected as a replay.
+      Segment::HNSHK.new(2, @secref, @blz, @username, @system_id, @profile_version, @security_function, @msg_no)
     end
 
     def build_encryption_head

@@ -7,7 +7,12 @@ module FinTS
       SECURITY_BOUNDARY = 1  # SHM
       SECURITY_SUPPLIER_ROLE = 1  # ISS
 
-      def initialize(segno, secref, blz, username, system_id, profile_version, security_function=SECURITY_FUNC)
+      # security_ref_no is the "Sicherheitsreferenznummer": per the FinTS
+      # Formals spec it must differ and increase with every signature within a
+      # dialog (replay protection). Reusing a value makes strict banks reject
+      # the message with "9340 Ungültige Signatur". The message number is used
+      # as it is unique and increasing within a dialog.
+      def initialize(segno, secref, blz, username, system_id, profile_version, security_function=SECURITY_FUNC, security_ref_no=1)
         data = [
           ['PIN', profile_version.to_s].join(':'),
           security_function,
@@ -15,7 +20,7 @@ module FinTS
           SECURITY_BOUNDARY,
           SECURITY_SUPPLIER_ROLE,
           ['1', '', system_id.to_s].join(':'),
-          1,
+          security_ref_no,
           ['1', Time.now.strftime('%Y%m%d'), Time.now.strftime('%H%M%S')].join(':'),
           ['1', '999', '1'].join(':'),  # Negotiate hash algorithm
           ['6', '10', '16'].join(':'),  # RSA mode

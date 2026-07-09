@@ -11,22 +11,44 @@ class SegmentTest < Minitest::Test
     assert_equal "HKIDN:5:2+280:123456+username+0+1'", hkidn.to_s
   end
 
-  def test_hkkaz
+  def test_hkcaz
     date_start = Date.new(2017, 2, 1)
     date_end = Date.new(2017, 2, 28)
-    hkkaz = FinTS::Segment::HKKAZ.new(5, 6, '123456', date_start, date_end, nil)
-    assert_equal "HKKAZ:5:6+123456+N+20170201+20170228++'", hkkaz.to_s
+    descriptor = 'urn:iso:std:iso:20022:tech:xsd:camt.052.001.02'
+    hkcaz = FinTS::Segment::HKCAZ.new(5, 1, '123456', descriptor, date_start, date_end, nil)
+    assert_equal "HKCAZ:5:1+123456+urn?:iso?:std?:iso?:20022?:tech?:xsd?:camt.052.001.02+N+20170201+20170228++'", hkcaz.to_s
   end
 
   def test_hkwpd
     account = ['123456', nil, '280', '778000111'].join(':')
-    hkpwd = FinTS::Segment::HKWPD.new(5, 6, account)
-    assert_equal "HKPWD:5:6+123456::280:778000111'", hkpwd.to_s
+    hkwpd = FinTS::Segment::HKWPD.new(5, 6, account)
+    assert_equal "HKWPD:5:6+123456::280:778000111'", hkwpd.to_s
   end
 
   def test_hkspa
     hkspa = FinTS::Segment::HKSPA.new(5, nil, nil, nil)
     assert_equal "HKSPA:5:1+'", hkspa.to_s
+  end
+
+  def test_hktan_initial
+    hktan = FinTS::Segment::HKTAN.new(5, 6, '4', segment_id: 'HKIDN')
+    assert_equal "HKTAN:5:6+4+HKIDN'", hktan.to_s
+  end
+
+  def test_hktan_initial_with_tan_medium
+    hktan = FinTS::Segment::HKTAN.new(5, 6, '4', segment_id: 'HKIDN', tan_medium: 'pushTAN')
+    assert_equal "HKTAN:5:6+4+HKIDN+++++++++pushTAN'", hktan.to_s
+  end
+
+  def test_hktan_status_request
+    hktan = FinTS::Segment::HKTAN.new(3, 6, 'S', order_ref: 'ORDERREF123')
+    assert_equal "HKTAN:3:6+S++++ORDERREF123+N'", hktan.to_s
+  end
+
+  def test_hktan_status_request_requires_order_ref
+    assert_raises ArgumentError do
+      FinTS::Segment::HKTAN.new(3, 6, 'S')
+    end
   end
 
   def test_hkspa_with_account_number
@@ -42,6 +64,11 @@ class SegmentTest < Minitest::Test
   def test_hkvvb
     hkvvb = FinTS::Segment::HKVVB.new(5)
     assert_equal "HKVVB:5:3+0+0+1+ruby_fints+#{FinTS::VERSION}'", hkvvb.to_s
+  end
+
+  def test_hkvvb_with_custom_product
+    hkvvb = FinTS::Segment::HKVVB.new(5, product_name: 'REG123456', product_version: '9.9')
+    assert_equal "HKVVB:5:3+0+0+1+REG123456+9.9'", hkvvb.to_s
   end
 
   def test_hnhbk
@@ -66,6 +93,13 @@ class SegmentTest < Minitest::Test
       secref = 9999999
       hnshk = FinTS::Segment::HNSHK.new(5, secref, '778000111', 'my?user', 1, 123)
       assert_equal "HNSHK:5:4+PIN:123+999+9999999+1+1+1::1+1+1:20170420:171700+1:999:1+6:10:16+280:778000111:my??user:S:0:0'", hnshk.to_s
+    end
+  end
+
+  def test_hnshk_with_security_ref_no
+    Delorean.time_travel_to(Time.new(2017, 4, 20, 17, 17)) do
+      hnshk = FinTS::Segment::HNSHK.new(5, 9999999, '778000111', 'my?user', 1, 123, 999, 7)
+      assert_equal "HNSHK:5:4+PIN:123+999+9999999+1+1+1::1+7+1:20170420:171700+1:999:1+6:10:16+280:778000111:my??user:S:0:0'", hnshk.to_s
     end
   end
 
