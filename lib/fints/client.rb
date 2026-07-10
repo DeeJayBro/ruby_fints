@@ -43,6 +43,14 @@ module FinTS
       false
     end
 
+    # Number of days of CAMT transaction history the bank keeps available for
+    # retrieval (the HICAZS "Speicherzeitraum"), or nil when unknown / not
+    # advertised. Known only after the bank parameter data has been retrieved
+    # (e.g. after the first get_sepa_accounts / get_balance).
+    def camt_storage_days
+      nil
+    end
+
     def get_sepa_accounts
       dialog = open_dialog(check_bpd: true)
 

@@ -13,6 +13,7 @@ module FinTS
     attr_accessor :tan_methods
     attr_accessor :holdings_supported
     attr_accessor :camt_descriptors
+    attr_accessor :camt_storage_days
 
     def initialize(blz, username, pin, system_id, connection, product_name: FinTS::GEM_NAME, product_version: FinTS::VERSION,
                    tan_mechanism: nil, tan_medium: nil, poll_interval: 5, max_poll_attempts: 60, tan_handler: nil)
@@ -41,6 +42,7 @@ module FinTS
       @tan_requirements = {}
       @holdings_supported = false
       @camt_descriptors = []
+      @camt_storage_days = nil
     end
 
     # The camt message format to request in HKCAZ, chosen from what the bank
@@ -76,7 +78,8 @@ module FinTS
         upd_version: @upd_version,
         tan_requirements: @tan_requirements,
         holdings_supported: @holdings_supported,
-        camt_descriptors: @camt_descriptors
+        camt_descriptors: @camt_descriptors,
+        camt_storage_days: @camt_storage_days
       }
     end
 
@@ -97,6 +100,7 @@ module FinTS
       @tan_requirements = params[:tan_requirements] if params[:tan_requirements]
       @holdings_supported = params[:holdings_supported] if params.key?(:holdings_supported)
       @camt_descriptors = params[:camt_descriptors] if params.key?(:camt_descriptors)
+      @camt_storage_days = params[:camt_storage_days] if params.key?(:camt_storage_days)
     end
 
     # HKVVB carrying the product identification and the currently known bank/user
@@ -129,6 +133,8 @@ module FinTS
         @hkcazversion = resp.get_hkcaz_max_version
         descriptors = resp.get_camt_descriptors
         @camt_descriptors = descriptors unless descriptors.empty?
+        days = resp.get_camt_storage_days
+        @camt_storage_days = days unless days.nil?
       end
       if resp.find_segment('HIWPDS')
         @hkwpdversion = resp.get_hkwpd_max_version

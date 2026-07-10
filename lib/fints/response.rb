@@ -123,6 +123,23 @@ module FinTS
       descriptors.uniq
     end
 
+    # Number of days the bank keeps CAMT transactions available for retrieval,
+    # i.e. the "Speicherzeitraum" advertised in HICAZS. It is the first element
+    # of the segment's CAMT parameter data group (the one carrying the camt
+    # descriptors); locating that group by its camt content avoids depending on
+    # how many common parameter fields precede it, which varies between banks and
+    # segment versions. Returns nil when it is not advertised.
+    def get_camt_storage_days
+      find_segments('HICAZS').each do |s|
+        split_for_data_groups(s).each do |dg|
+          next unless dg.include?('camt.')
+          first = split_for_data_elements(dg).first.to_s
+          return first.to_i if first =~ /\A\d+\z/
+        end
+      end
+      nil
+    end
+
     def get_hksal_max_version
       get_segment_max_version('HISALS')
     end

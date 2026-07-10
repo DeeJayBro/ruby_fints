@@ -36,6 +36,10 @@ module FinTS
       !!(@bpd && @bpd[:holdings_supported])
     end
 
+    def camt_storage_days
+      @bpd && @bpd[:camt_storage_days]
+    end
+
     protected
 
     def new_dialog
