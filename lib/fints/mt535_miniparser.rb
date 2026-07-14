@@ -5,6 +5,8 @@ module FinTS
   # the HIWPD segment when a securities account (Depot) is queried via HKWPD.
   class MT535Miniparser
     RE_IDENTIFICATION = /^:35B:ISIN\s(.*)\|(.*)\|(.*)$/
+    # National securities identifier, e.g. '/DE/ETF127' -> WKN 'ETF127'.
+    RE_WKN = %r{^/[A-Z]{2}/(.*)$}
     RE_MARKETPRICE = /^:90B::MRKT\/\/ACTU\/([A-Z]{3})(\d*),{1}(\d*)$/
     RE_PRICEDATE = /^:98A::PRIC\/\/(\d*)$/
     RE_PIECES = /^:93B::AGGR\/\/UNIT\/(\d*),(\d*)$/
@@ -18,7 +20,7 @@ module FinTS
       finsegs = grab_financial_instrument_segments(clauses)
       # Third: Extract financial instrument data
       finsegs.each do |finseg|
-        isin = name = market_price = price_symbol = price_date = pieces = total_value = nil
+        isin = wkn = name = market_price = price_symbol = price_date = pieces = total_value = nil
         finseg.each do |clause|
           # identification of instrument
           # e.g. ':35B:ISIN LU0635178014|/DE/ETF127|COMS.-MSCI EM.M.T.U.ETF I'
@@ -26,6 +28,11 @@ module FinTS
           if m
             isin = m[1]
             name = m[3]
+            # The middle field carries the national identifier, usually a WKN
+            # prefixed with its ISO country scheme ('/DE/847424'). Strip the
+            # scheme when present; otherwise keep the raw value.
+            wkn_match = RE_WKN.match(m[2])
+            wkn = wkn_match ? wkn_match[1] : m[2]
           end
           # current market price
           # e.g. ':90B::MRKT//ACTU/EUR38,82'
@@ -56,6 +63,7 @@ module FinTS
         # processed all clauses
         retval << {
           ISIN: isin,
+          WKN: wkn,
           name: name,
           market_value: market_price,
           value_symbol: price_symbol,

@@ -226,6 +226,21 @@ module FinTS
           payload << match[2]
         end
       end
+      repair_camt_encoding(payload)
+    end
+
+    # The transport (HTTPSConnection) decodes the whole FinTS response as
+    # ISO-8859-1 and re-encodes it to UTF-8, which is correct for the Latin-1
+    # envelope but double-encodes the CAMT XML embedded in HICAZ, which is itself
+    # UTF-8 - e.g. "München" arrives as "MÃ¼nchen". Undo it by recovering the
+    # original wire bytes and reading them as UTF-8. Only applied when that yields
+    # valid UTF-8, so a bank that genuinely sends ISO-8859-1 CAMT (already decoded
+    # correctly by the transport) is left untouched.
+    def repair_camt_encoding(payload)
+      recovered = payload.encode('iso-8859-1')
+      recovered.force_encoding('utf-8')
+      recovered.valid_encoding? ? recovered : payload
+    rescue Encoding::UndefinedConversionError, Encoding::InvalidByteSequenceError
       payload
     end
 

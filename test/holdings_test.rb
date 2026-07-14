@@ -47,6 +47,7 @@ class HoldingsTest < Minitest::Test
 
     first = holdings[0]
     assert_equal 'LU0635178014', first[:ISIN]
+    assert_equal 'ETF127', first[:WKN]
     assert_equal 'COMS.-MSCI EM.M.T.U.ETF I', first[:name]
     assert_equal 38.82, first[:market_value]
     assert_equal 'EUR', first[:value_symbol]
@@ -56,6 +57,7 @@ class HoldingsTest < Minitest::Test
 
     second = holdings[1]
     assert_equal 'DE0008474248', second[:ISIN]
+    assert_equal '847424', second[:WKN]
     assert_equal 'DEKA-EUROPAPOTENTIAL CF', second[:name]
     assert_equal 154.8, second[:market_value]
     assert_equal 3.7315, second[:pieces]

@@ -141,6 +141,40 @@ class StatementTest < Minitest::Test
     refute(conn.sent.any? { |m| m.include?('HKKAZ') }, 'must not send HKKAZ any more')
   end
 
+  def test_get_statement_repairs_transport_double_encoded_utf8
+    # The transport decodes the whole response as ISO-8859-1 then re-encodes to
+    # UTF-8; the CAMT XML is itself UTF-8, so "München" reaches us double-encoded
+    # as "MÃ¼nchen". get_statement must repair it back to "München".
+    mangled = 'München'.encode('utf-8').b.force_encoding('iso-8859-1').encode('utf-8')
+    refute_equal 'München', mangled, 'sanity: the name really is corrupted on the wire'
+
+    camt = CAMT.sub('ACME GmbH', mangled)
+    init_resp = "HNHBK:1:3+000000000100+300+DLG1+2'HIRMG:2:2+0010::ok'HNHBS:3:1+2'"
+    statement_resp = "HNHBK:1:3+000000000100+300+DLG1+2'HIRMG:2:2+0010::ok'" +
+                     hicaz_segment(camt) + "'HNHBS:4:1+2'"
+    end_resp = "HNHBK:1:3+000000000100+300+DLG1+3'HIRMG:2:2+0010::ok'HNHBS:2:1+3'"
+
+    conn = ScriptedConnection.new([init_resp, statement_resp, end_resp])
+    client = build_client(conn)
+
+    tx = client.get_statement(account, Date.new(2023, 3, 1), Date.new(2023, 3, 2)).first
+    assert_equal 'München', tx[:name]
+  end
+
+  def test_repair_camt_encoding_reverses_double_encoding
+    client = FinTS::PinTanClient.new('778000111', 'hermes', '1234', 'https://example.com/fints')
+    mangled = 'Zürich Straße'.encode('utf-8').b.force_encoding('iso-8859-1').encode('utf-8')
+    assert_equal 'Zürich Straße', client.repair_camt_encoding(mangled)
+  end
+
+  def test_repair_camt_encoding_leaves_genuine_latin1_derived_text_untouched
+    # "Köln" is correct UTF-8 whose byte-reversal is invalid UTF-8, i.e. what you
+    # get when the transport already decoded ISO-8859-1 CAMT correctly. It must
+    # not be "repaired" (which would corrupt it).
+    client = FinTS::PinTanClient.new('778000111', 'hermes', '1234', 'https://example.com/fints')
+    assert_equal 'Köln', client.repair_camt_encoding('Köln')
+  end
+
   def test_get_transactions_is_an_alias_for_get_statement
     init_resp = "HNHBK:1:3+000000000100+300+DLG1+2'HIRMG:2:2+0010::ok'HNHBS:3:1+2'"
     statement_resp = "HNHBK:1:3+000000000100+300+DLG1+2'HIRMG:2:2+0010::ok'" +
